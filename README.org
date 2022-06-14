@@ -19,7 +19,7 @@ To declare a local scope inside a stackfn, the ~local~ keyword is used much like
 ** Clojure Interop
 Clojure expressions are valid in the aforementioned locations. Clojure functions are also valid as the first argument to ~invoke>~. ~invoke>~ takes a Clojure function, or a predefined stack variable as its first argument (symbols generally work here since symbols are invokable in Clojure, thus it is important that the user predefines stack variables intended to be invoked as functions in order to avoid potentially confusing errors or behavior). ~invoke>~ takes a non-negative number ~n~ as its second argument, and pops ~n~ elements from the stack to be used as arguments.
 #+BEGIN_SRC clojure
-((stackfn [] 1 2 3 (invoke> list 3))) ;; => (1 2 3)
+((stackfn [] 1 2 3 (invoke> list 3))) ;; => (3 2 1)
 #+END_SRC
 
 If the stack has fewer elements than specified by ~n~, then ~invoke>~ will throw an ~IllegalArgumentException~.
