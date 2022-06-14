@@ -1,0 +1,7 @@
+.DS_Store
+.idea
+*.log
+tmp/
+repl-take-home-project1.clj.pdf
+src-backup/*
+.cpcache/*
