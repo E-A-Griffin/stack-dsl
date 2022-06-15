@@ -123,7 +123,7 @@ false
 Generally speaking, I/O can be used via the first argument to ~invoke>~, much in the same way as in Clojure, though the expression ~input>~ is available as syntactic sugar for ~(invoke> read-line 0)~.
 ** Java Interop
 Much like Clojure includes Java Interop, so does stack-clj. Java methods may be invoked via one of three stack-clj expressions:
-~(.static> class-name method-name & args?)~ takes a class-name, (including forms like ~(new java.util.Date)~, ~java.util.Calendar~, or ~java.util.GregorianCalendar.~), a method-name, and any number of arguments to be applied to the method.
+~(.static> class-name method-name & args?)~ takes a class-name, (including forms like ~(new java.util.Date)~, ~java.util.Calendar~, or ~(java.util.GregorianCalendar.)~), a method-name, and any number of arguments to be applied to the method.
 ~(.var> var method-name & args?)~ takes a predefined stack variable that maps to a Java Object, a method-name, and any number of arguments, which may also be specified as predefined stack variables.
 ** etc.
 Other built-in stack-clj expressions include
