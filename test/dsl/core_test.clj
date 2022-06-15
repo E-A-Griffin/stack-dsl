@@ -310,6 +310,15 @@
    while> true?)
   !n)
 
+;; Test invoke> arity options
+(sut/defstackfn invocations [& !args]
+  !args
+  (foreach> !args
+            (invoke> list :all))
+  <dup>
+  (invoke> first 1)
+  (invoke> (comp set list) :top))
+
 ;; Test internal state
 (sut/defstackfn state [& !vargs]
   (local [!a :a
@@ -618,6 +627,8 @@
                        (.var> !deque addLast !polled)))
              (.var> !deque toArray))
 
+
+
 ;; To simulate the error handling of defstackfn without dealing with trying to
 ;; catch clojure.lang.compiler$compilerexception, simply check
 ;; validate-stack-fn-args instead
@@ -683,7 +694,7 @@
                    "assignment to a new or predeclared variable e.g. !a\\+"
                    "a constant \\(numeric, string, keyword, or boolean\\) e\\.g\\. 7"
                    "one of the following forms: "
-                   "\tlocal, <do, if>, <prn-state>, <clear-stack>, until>, while>, <dup>, \\.>, <push-constant>, input>, doseq>, invoke>, \\.static>, <pop>, stackfn, foreach>"
+                   "\tlocal, <do, if>, <prn-state>, <clear-stack>, until>, while>, \\.var>, <dup>, \\.>, <push-constant>, input>, doseq>, invoke>, \\.static>, <pop>, stackfn, foreach>"
                    "but received "])]
     (t/are [stackfn-decl nested-ex-type syntax-err-msg
             nested-ex-err-msg]

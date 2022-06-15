@@ -17,9 +17,11 @@ A new ~stackfn~ may be declared one of two ways, either globally with
 ** Local
 To declare a local scope inside a stackfn, the ~local~ keyword is used much like the ~let~ keyword in Clojure, though with restricted bindings. The symbol (left-hand side of a binding pair) must be a valid stack variable, and may not be destructured. The right-hand side of a binding pair must either be a stack constant or a stackfn.
 ** Clojure Interop
-Clojure expressions are valid in the aforementioned locations. Clojure functions are also valid as the first argument to ~invoke>~. ~invoke>~ takes a Clojure function, or a predefined stack variable as its first argument (symbols generally work here since symbols are invokable in Clojure, thus it is important that the user predefines stack variables intended to be invoked as functions in order to avoid potentially confusing errors or behavior). ~invoke>~ takes a non-negative number ~n~ as its second argument, and pops ~n~ elements from the stack to be used as arguments.
+Clojure expressions are valid in the aforementioned locations. Clojure functions are also valid as the first argument to ~invoke>~. ~invoke>~ takes a Clojure function, or a predefined stack variable as its first argument (symbols generally work here since symbols are invokable in Clojure, thus it is important that the user predefines stack variables intended to be invoked as functions in order to avoid potentially confusing errors or behavior). ~invoke>~ takes either a non-negative number ~n~ as its second argument or one of the keywords, ~:top~ or ~:all~ and pops ~n~ elements from the stack to be used as arguments in the former case. If ~:top~ is specified then the top of the stack is popped and whatever value is specified at the top of the stack is then taken as ~n~. If ~:all~ is specified ~(count stack)~ is taken as ~n~.
 #+BEGIN_SRC clojure
 ((stackfn [] 1 2 3 (invoke> list 3))) ;; => (3 2 1)
+((stackfn [] 1 2 3 (invoke> list :all))) ;; => (3 2 1)
+((stackfn [] 1 2 3 3 (invoke> list :top))) ;; => (3 2 1)
 #+END_SRC
 
 If the stack has fewer elements than specified by ~n~, then ~invoke>~ will throw an ~IllegalArgumentException~.

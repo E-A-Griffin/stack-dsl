@@ -2,8 +2,8 @@
   (:require [clojure.string :as str]
             [clojure.core.reducers :as r]))
 
-;; TODO: Throw compiler error on wrong number of args to invoke> prior to
-;; evaluation
+;; TODO: restrict new-top in while> and until> to a constant
+;; Fix issue with passing variable as predicate
 
 ;; Stack predicates
 (defn stack-var?
@@ -22,8 +22,11 @@
   "True iff op is invokable and arity is a non-negative integer"
   [op arity]
   (and (ifn? op)
-       (int? arity)
-       (>= arity 0)))
+       (or
+          (= arity :top)
+          (= arity :all)
+          (and (int? arity)
+               (>= arity 0)))))
 
 (defn constant?
   "True iff c is a valid stack constant"
@@ -168,6 +171,7 @@
   (let [in (read-line)]
   [(conj stack in) sym-tbls]))
 
+;; TODO: Add support for :top and :all options
 (defn invoke>
   "Invokes (apply op (take arity stack))"
   [[stack sym-tbls] op arity]
@@ -185,13 +189,18 @@
                      "received type " (type op))
                 (str "invoke> expects its second argument to be an integer >= "
                      "0 but received {type: " (type arity) ", value: " arity
-                     "}")))))]
+                     "}")))))
+        [stack arity] (case arity
+                        :top [(pop stack) (peek stack)]
+                        :all [stack (count stack)]
+                        [stack arity])]
 
      (if (> arity (count stack))
        (throw (IllegalArgumentException.
                (str "invoke> called with arity " arity " despite stack only "
                     "containing " (count stack) " elements")))
-       (let [args            (take arity stack)
+       (let [
+             args            (take arity stack)
              remaining-stack (pop-n arity stack)]
          [(conj remaining-stack (apply f args)) sym-tbls]))))
 
@@ -359,12 +368,15 @@
                                                                       e#)]
                                    (sym-tbl# e#)
                                    e#))]
-     (let [res# (if (coll? '~s-expr)
+     (let [original-coll?# (coll? '~s-expr)
+           res# (if original-coll?#
                   (map replace-val-if-found#
                        '~s-expr)
                   (replace-val-if-found# '~s-expr))]
        ;; Try to evaluate resultant form, if not, return the quoted form
-       (try (eval res#)
+       (try (if original-coll?#
+              (eval res#)
+              res#)
             (catch Exception e#
               ;; If every element of collection is a valid constant then this
               ;; is also fine, but if any elements are not, return string to
@@ -380,13 +392,12 @@
         coll `(suppress-io ~coll)]
     (let [check-is-coll
           `(if-not
-               (coll? ~coll)
+             (coll? ~coll)
              ;; Note that while the first argument is
              ;; loop-name, this is abstracted away from the
              ;; end user and so coll is considered
              ;; the first argument for error reporting
-             (do (prn "type of thrown 'coll': " (type ~coll))
-               (throw (IllegalArgumentException.
+             (throw (IllegalArgumentException.
                      ;; Try to provide better error messages
                      ;; for understandable syntax errors
                      (if (and (string? ~coll)
@@ -413,7 +424,7 @@
                             "(range !n !m) => (range 3 5)).\n")
                        (str '~loop-name
                             " expects its first argument to be a collection "
-                            "but received " ~coll))))))
+                            "but received " ~coll)))))
           cur `(first ~coll)
           rem `(rest ~coll)
           stack+sym-tbls `(update ~stack+sym-tbls 0 (fn [x#] (conj x# ~cur)))
@@ -462,28 +473,26 @@
 (defmacro non-coll-loop
   "Generic helper macro for common functionality between while> and until>"
   [loop-name pred-true? stack+sym-tbls maybe-top+pred & body]
-  (let [check-isnt-stackfn `(if (and
-                                 (list? ~maybe-top+pred)
-                                 (= (some-> ~maybe-top+pred
-                                            str
-                                            (str/split #"\(")
-                                            second
-                                            (str/split #" ")
-                                            first)
-                                    "stackfn"))
-                              (throw (IllegalArgumentException.
-                                      ;; Try to provide better error messages
-                                      ;; for understandable syntax errors
-                                      (str "stackfns cannot be used as "
-                                           "the predicate function for "
-                                           '~loop-name ". The predicate "
-                                           "function must either be a "
-                                           "Clojure function (e.g. zero?) "
-                                           "or a predefined stack variable "
-                                           "(e.g. !v)."))))
+  (let [maybe-top+pred (if (vector? maybe-top+pred)
+                         (update maybe-top+pred 1 (fn [pred]
+                                                    (if (stack-var? pred)
+                                                      (list `quote pred)
+                                                      pred)))
+
+                         (if (stack-var? maybe-top+pred)
+                           (list `quote maybe-top+pred)
+                           maybe-top+pred))
         pred `(if (vector? ~maybe-top+pred)
                 (second ~maybe-top+pred)
                 ~maybe-top+pred)
+        ;; throw-on-non-const (if (and (vector? (first maybe-top+pred))
+        ;;                             (constant? (first maybe-top+pred)))
+        ;;                      (throw (IllegalArgumentException.
+        ;;                                         (str "New top of stack for "
+        ;;                                              '~loop-name " must be "
+        ;;                                              "a constant (string, "
+        ;;                                              "number, boolean, or "
+        ;;                                              "keyword)"))))
         stack+sym-tbls `(if (vector? ~maybe-top+pred)
                           (update ~stack+sym-tbls 0
                                   (fn [x#]
@@ -493,19 +502,18 @@
         parsed-exprs (parse-stack-exprs body)
         pred-test-fn (if pred-true? not identity)]
     ;; Ensure that pred can be invoked on top of stack or sym-tbl
-    `(do ~check-isnt-stackfn
-         (if-not ((some-fn ifn? stack-var?) ~pred)
+    `(if-not ((some-fn ifn? stack-var?) ~pred)
            ;; Note that while the first argument is stack+sym-tbl, this is
            ;; abstracted away from the end user and so maybe-top+pred is considered
            ;; the first argument for error reporting
-           (throw (IllegalArgumentException.
+           (do (prn ~pred) (throw (IllegalArgumentException.
                    (str '~loop-name
                         " expects its first argument to be one of:\n"
                         "a predicate function or a predefined variable\n"
                         "a 2 element vector, where the first element is the new "
                         "top of the stack and the second element is a predicate "
                         "function, or a predefined variable\n"
-                        "but received " ~maybe-top+pred)))
+                        "but received " ~maybe-top+pred))))
            (loop [stack+sym-tbls# ~stack+sym-tbls]
              ;; Base cases are that either
              ;; (pred top-of-stack) = false or
@@ -523,14 +531,14 @@
                     ;; we need to keep the predicate a symbol until we know for
                     ;; sure it refers to an actual function and not a variable
                     ;; name
-                    (get-first-matching-sym-tbl (second stack+sym-tbls#)
-                                                '~pred)
+                    ((get-first-matching-sym-tbl (second stack+sym-tbls#)
+                                                ~pred) ~pred)
                     (~pred cur-top#)))
                  stack+sym-tbls#
                  :else (recur
                         (do-until-continue-or-break
                          stack+sym-tbls#
-                         ~@parsed-exprs)))))))))
+                         ~@parsed-exprs))))))))
 
 (defmacro throw-on-stackfn
   "Throw exception when stackfn declaration used where a regular function is
@@ -559,10 +567,6 @@
     maybe-top+pred))
 
 ;; Stack macros (exposed to end user)
-
-;;TODO: Need macro that call stackfn*, pushes result on stack and returns
-;; stack+sym-tbl
-
 (defmacro push-stackfn
   "Creates new stackfn with initial symtbls appended, then pushes this on
    stack, with updated stack+sym-tbls returned"
@@ -643,8 +647,8 @@
   (assert-args
    (vector? bindings) "a vector for its binding"
    (even? (count bindings)) "an even number of forms in binding vector"
-   (every? stack-var? (flatten (take-nth 2 bindings)))
-   "local variables to start with '!'")
+   (every? stack-var? (take-nth 2 bindings))
+   "local variables to start with '!' and does not support destructuring")
   (let [stack+sym-tbls `(update ~stack+sym-tbls 1 (fn [sym-tbls#]
                                                     (conj sym-tbls# {})))
         eager-loop `(loop [stack+sym-tbls# ~stack+sym-tbls
@@ -707,9 +711,9 @@
                                         (throw
                                          (IllegalArgumentException.
                                           (str "Local binding must bind a "
-                                               "(possibly destructured) var "
-                                               "to a stackfn or a constant, but "
-                                               "instead bound to " value#))))}
+                                               "var to a stackfn or a constant, "
+                                               "but instead bound to "
+                                               value#))))}
                             stack+sym-tbls# [(first stack+sym-tbls#)
                                              (conj
                                               (pop (second stack+sym-tbls#))
@@ -767,11 +771,6 @@
                                               (lookup-args
                                                (second ~stack+sym-tbls)
                                                '~args)))))))))
-
-(defn helper
-  [obj method & args]
-  (prn method)
-  (. obj method))
 
 (defmacro .>
   "Invoke virtual method (from inside stack function body). Note that
@@ -851,13 +850,13 @@
     (invoke> (fn square [n] (* n n)) 1))"
   [stack+sym-tbls maybe-top+pred & body]
   `(non-coll-loop ~'until> false ~stack+sym-tbls
-                  (throw-on-stackfn ~'until> ~maybe-top+pred) ~@body))
+                  ~(throw-on-stackfn 'until> maybe-top+pred) ~@body))
 
 (defmacro while>
   "Like until> but executes body until (pred top-of-stack) is false (or nil)."
   [stack+sym-tbls maybe-top+pred & body]
   `(non-coll-loop ~'while> true ~stack+sym-tbls
-                  (throw-on-stackfn ~'while> ~maybe-top+pred)
+                  ~(throw-on-stackfn 'while> maybe-top+pred)
                                     ~@body))
 
 (defmacro <do
