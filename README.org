@@ -80,7 +80,7 @@ false
 ;; correctly
 #+END_SRC
 *** foreach>
-~foreach>~ takes a collection literal of constants or (non-nested) predefined variables (e.g. [1 "two" !three]) or an expression that evaluates to a collection (e.g. (range 10)) and iterates through each element, pushing the current element onto the stack, then evaluating the body of the loop.
+~foreach>~ takes a collection literal of constants or (non-nested) predefined variables (e.g. ~[1 "two" !three]~) or an expression that evaluates to a collection (e.g. ~(range 10)~) and iterates through each element, pushing the current element onto the stack, then evaluating the body of the loop.
 #+BEGIN_SRC clojure
 (foreach> (range 10)
           (invoke> identity 1))
@@ -129,7 +129,7 @@ Much like Clojure includes Java Interop, so does stack-clj. Java methods may be 
 Other built-in stack-clj expressions include
 - ~<dup>~ pushes the top of the stack onto the top of the stack, effectively duplicating the top of the stack
 - ~<prn-state>~ prints the current stack and symbol tables to the console
--
+- ~<pop>~ pops the top of the stack. Throws an error when evaluated on an empty stack.
 
 * Examples
 Example stack-clj programs (specified as global stackfns) are provided in ~test/dsl/core_test.clj~. For convenience, a sample of these are copied here.
