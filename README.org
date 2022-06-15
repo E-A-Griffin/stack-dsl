@@ -25,6 +25,8 @@ Clojure expressions are valid in the aforementioned locations. Clojure functions
 #+END_SRC
 
 If the stack has fewer elements than specified by ~n~, then ~invoke>~ will throw an ~IllegalArgumentException~.
+** Branching
+Branching is handled via ~(if> ... else>? ...)~. This expression pops the top of the stack ~t~ and executes all expressions that come after ~if>~ and before either ~else>~ or the end of ~if>~ (specified by the closing right parenthesis) iff ~t~ is truthy (i.e. not false or nil), otherwise all expressions after ~else>~ are evaluated (if an ~else>~ branch is specified as an ~if>~ expression may have either 0 or 1 associated ~else>~ branches).
 ** Loops
 Stack-clj supports 8 types of loop, ~while>~, ~until>~, ~foreach>~, ~doseq>~, and the ~<do ...~ forms of each of the first four (e.g. ~<do ... while>~ or ~<do ... foreach>~). ~continue~ may be used to short-circuit evaluation of a particular loop iteration, while ~break~ may be used to do the same and also exit the loop without any further evaluation of the loop.
 *** while>
@@ -123,6 +125,11 @@ Generally speaking, I/O can be used via the first argument to ~invoke>~, much in
 Much like Clojure includes Java Interop, so does stack-clj. Java methods may be invoked via one of three stack-clj expressions:
 ~(.static> class-name method-name & args?)~ takes a class-name, (including forms like ~(new java.util.Date)~, ~java.util.Calendar~, or ~java.util.GregorianCalendar.~), a method-name, and any number of arguments to be applied to the method.
 ~(.var> var method-name & args?)~ takes a predefined stack variable that maps to a Java Object, a method-name, and any number of arguments, which may also be specified as predefined stack variables.
+** etc.
+Other built-in stack-clj expressions include
+- ~<dup>~ pushes the top of the stack onto the top of the stack, effectively duplicating the top of the stack
+- ~<prn-state>~ prints the current stack and symbol tables to the console
+-
 
 * Examples
 Example stack-clj programs (specified as global stackfns) are provided in ~test/dsl/core_test.clj~. For convenience, a sample of these are copied here.
